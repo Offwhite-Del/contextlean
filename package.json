@@ -36,7 +36,7 @@
   },
   "scripts": {
     "audit:self": "node bin/contextlean.mjs audit --root . --json",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test test/contextlean.test.mjs",
     "validate": "npm test && npm run audit:self"
   }
 }
