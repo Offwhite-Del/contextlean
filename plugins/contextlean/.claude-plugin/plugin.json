@@ -1,0 +1,13 @@
+{
+  "name": "contextlean",
+  "version": "0.1.0",
+  "description": "Audit and safely reduce avoidable context and configuration overhead in local AI agent environments.",
+  "author": {
+    "name": "Offwhite-Del",
+    "url": "https://github.com/Offwhite-Del"
+  },
+  "homepage": "https://github.com/Offwhite-Del/contextlean",
+  "repository": "https://github.com/Offwhite-Del/contextlean",
+  "license": "Apache-2.0",
+  "keywords": ["agent-skills", "codex", "claude-code", "context-engineering"]
+}

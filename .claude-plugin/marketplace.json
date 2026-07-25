@@ -1,0 +1,21 @@
+{
+  "name": "contextlean",
+  "owner": {
+    "name": "Offwhite-Del",
+    "url": "https://github.com/Offwhite-Del"
+  },
+  "metadata": {
+    "description": "Local, reversible Agent context and configuration optimization."
+  },
+  "plugins": [
+    {
+      "name": "contextlean",
+      "source": "./plugins/contextlean",
+      "description": "Audit, plan, apply, verify, and roll back Agent environment optimizations.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Offwhite-Del"
+      }
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "name": "contextlean",
+  "version": "0.1.0",
+  "description": "Local, reversible context and configuration doctor for AI agent environments.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Offwhite-Del",
+  "homepage": "https://github.com/Offwhite-Del/contextlean#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Offwhite-Del/contextlean.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Offwhite-Del/contextlean/issues"
+  },
+  "keywords": [
+    "agent-skills",
+    "claude-code",
+    "codex",
+    "context-engineering",
+    "developer-tools"
+  ],
+  "bin": {
+    "contextlean": "bin/contextlean.mjs"
+  },
+  "files": [
+    "bin/",
+    "plugins/",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "SECURITY.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "audit:self": "node bin/contextlean.mjs audit --root . --json",
+    "test": "node --test test/*.test.mjs",
+    "validate": "npm test && npm run audit:self"
+  }
+}

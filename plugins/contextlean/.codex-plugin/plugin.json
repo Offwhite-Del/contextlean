@@ -1,0 +1,28 @@
+{
+  "name": "contextlean",
+  "version": "0.1.0",
+  "description": "Audit and safely reduce avoidable context and configuration overhead in local AI agent environments.",
+  "author": {
+    "name": "Offwhite-Del",
+    "url": "https://github.com/Offwhite-Del"
+  },
+  "homepage": "https://github.com/Offwhite-Del/contextlean",
+  "repository": "https://github.com/Offwhite-Del/contextlean",
+  "license": "Apache-2.0",
+  "keywords": ["agent-skills", "codex", "claude-code", "context-engineering"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "ContextLean",
+    "shortDescription": "Measure and safely reduce Agent context overhead",
+    "longDescription": "A local-only, reversible Agent environment doctor for rules, Skills, plugins, hooks, and cross-vendor configuration. It audits first, applies only hash-guarded reviewed plans, verifies results, and supports rollback.",
+    "developerName": "Offwhite-Del",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/Offwhite-Del/contextlean",
+    "defaultPrompt": [
+      "Audit this Agent environment and explain the highest-value safe optimizations.",
+      "Measure this repository's always-on context and prepare a reversible cleanup plan."
+    ],
+    "brandColor": "#16A085"
+  }
+}
