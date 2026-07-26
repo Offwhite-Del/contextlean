@@ -1,6 +1,8 @@
-<div align="center">
-  <img src="assets/contextlean-hero.svg" alt="ContextLean — 测量、精简、验证、回滚" width="100%">
-</div>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/contextlean-hero-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/contextlean-hero-light.svg">
+  <img src="assets/contextlean-hero-light.svg" alt="ContextLean — 测量、精简、验证、回滚" width="100%">
+</picture>
 
 <div align="center">
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
@@ -57,6 +59,21 @@ node bin/contextlean.mjs doctor
 ```
 
 `audit` 默认只审计当前仓库；`doctor` 同时审计仓库和用户级 Agent 配置。两者都不会修改文件。
+
+## 查看实际输出
+
+对 ContextLean 自身运行只读仓库审计会得到：
+
+```text
+ContextLean 0.1.0
+Scope: repo
+Instructions: 1 files, 499 bytes (~125 tokens)
+Skills: 0; enabled plugins: 0
+Privacy: no auth files, secret values, or session transcripts read
+Findings: none at current heuristic thresholds
+```
+
+输出展示的是测量结果与启发式发现；“没有发现”不代表任何仓库都已达到最优配置。
 
 ## 命令
 

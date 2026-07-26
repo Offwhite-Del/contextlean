@@ -24,7 +24,8 @@
     "contextlean": "bin/contextlean.mjs"
   },
   "files": [
-    "assets/",
+    "assets/contextlean-hero-dark.svg",
+    "assets/contextlean-hero-light.svg",
     "bin/",
     "plugins/",
     "CHANGELOG.md",
