@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextlean.dev/schemas/tasks.schema.json",
+  "title": "ContextLean frozen tasks",
+  "type": "object",
+  "required": ["schema", "tasks"],
+  "properties": {
+    "schema": { "const": "contextlean.tasks/v1" },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "category", "prompt", "dataClass", "heldOut", "allowedTools", "assertions"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,127}$" },
+          "category": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" },
+          "prompt": { "type": "string", "minLength": 1, "maxLength": 50000 },
+          "dataClass": { "const": "non_sensitive" },
+          "heldOut": { "type": "boolean" },
+          "allowedTools": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,128}$" } },
+          "assertions": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+              "success": { "type": "boolean" },
+              "outputEquals": { "type": "string" },
+              "outputIncludes": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "outputExcludes": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "exactToolCalls": { "type": "integer", "minimum": 0 },
+              "maxToolCalls": { "type": "integer", "minimum": 0 },
+              "maxRepeatedReads": { "type": "integer", "minimum": 0 },
+              "sideEffectsZero": { "type": "boolean" }
+            },
+            "anyOf": [
+              { "properties": { "outputEquals": true }, "required": ["outputEquals"] },
+              { "properties": { "outputIncludes": true }, "required": ["outputIncludes"] },
+              { "properties": { "outputExcludes": true }, "required": ["outputExcludes"] }
+            ],
+            "additionalProperties": false
+          },
+          "rubric": { "type": "string", "minLength": 1, "maxLength": 20000 },
+          "measureLatency": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextlean.dev/schemas/adapter.schema.json",
+  "title": "ContextLean adapter specification",
+  "type": "object",
+  "required": ["schema", "role", "argv", "timeoutMs"],
+  "properties": {
+    "schema": { "const": "contextlean.adapter/v1" },
+    "role": { "enum": ["optimizer", "runner", "judge"] },
+    "argv": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "timeoutMs": { "type": "integer", "minimum": 100, "maximum": 900000 }
+    ,
+    "sandboxReceipt": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "role": { "const": "runner" } } },
+      "then": { "properties": { "sandboxReceipt": true }, "required": ["sandboxReceipt"] },
+      "else": { "not": { "required": ["sandboxReceipt"] } }
+    }
+  ],
+  "additionalProperties": false
+}

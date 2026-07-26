@@ -1,7 +1,7 @@
 {
   "name": "contextlean",
-  "version": "0.1.0",
-  "description": "Local, reversible context and configuration doctor for AI agent environments.",
+  "version": "0.2.0",
+  "description": "Local, reversible, evidence-driven context optimizer for AI agent environments.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "Offwhite-Del",
@@ -27,6 +27,7 @@
     "assets/contextlean-hero-dark.svg",
     "assets/contextlean-hero-light.svg",
     "bin/",
+    "examples/",
     "plugins/",
     "CHANGELOG.md",
     "README.md",
@@ -39,7 +40,11 @@
   },
   "scripts": {
     "audit:self": "node bin/contextlean.mjs audit --root . --json",
-    "test": "node --test test/contextlean.test.mjs",
+    "test": "node --test test/contextlean.test.mjs test/optimization.test.mjs",
     "validate": "npm test && npm run audit:self"
+  },
+  "devDependencies": {
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1"
   }
 }

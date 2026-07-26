@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextlean.dev/schemas/experiment.schema.json",
+  "title": "ContextLean frozen experiment",
+  "type": "object",
+  "required": ["schema", "snapshot", "tasks", "profile", "environment", "repetitions", "maxCandidatesPerTarget", "randomizationSeed", "experimentSha256"],
+  "properties": {
+    "schema": { "const": "contextlean.experiment/v1" },
+    "snapshot": { "type": "object" },
+    "tasks": { "type": "object" },
+    "profile": { "type": "object" },
+    "environment": {
+      "type": "object",
+      "required": ["model", "reasoning", "sessionPersistence", "toolPolicy"],
+      "properties": {
+        "model": { "type": "string" },
+        "reasoning": { "type": "string" },
+        "sessionPersistence": { "const": false },
+        "toolPolicy": { "const": "per-task-allowlist" }
+      }
+    },
+    "repetitions": { "type": "integer", "minimum": 1, "maximum": 10 },
+    "maxCandidatesPerTarget": { "type": "integer", "minimum": 1, "maximum": 2 },
+    "randomizationSeed": { "type": "string" },
+    "experimentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "additionalProperties": true
+}

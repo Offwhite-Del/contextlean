@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextlean.dev/schemas/profile.schema.json",
+  "title": "ContextLean quality-first optimization profile",
+  "type": "object",
+  "required": ["schema", "invariants", "qualityGates"],
+  "properties": {
+    "schema": { "const": "contextlean.profile/v1" },
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "description"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" },
+          "description": { "type": "string", "minLength": 1, "maxLength": 2000 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "objectives": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 2000 } },
+    "qualityGates": {
+      "type": "object",
+      "required": ["requiredCategoryPasses", "minBlindNonInferior", "maxBlindLosses", "minBlindNetWins", "minInputTokenImprovementPct", "minToolImprovementPct", "minLatencyImprovementPct", "maxOtherRegressionPct"],
+      "properties": {
+        "requiredCategoryPasses": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" },
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        },
+        "minBlindNonInferior": { "type": "number", "exclusiveMinimum": 0 },
+        "maxBlindLosses": { "type": "number", "minimum": 0 },
+        "minBlindNetWins": { "type": "number", "exclusiveMinimum": 0 },
+        "minInputTokenImprovementPct": { "type": "number", "minimum": 5 },
+        "minToolImprovementPct": { "type": "number", "minimum": 10 },
+        "minLatencyImprovementPct": { "type": "number", "minimum": 10 },
+        "maxOtherRegressionPct": { "type": "number", "minimum": 0, "maximum": 10 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

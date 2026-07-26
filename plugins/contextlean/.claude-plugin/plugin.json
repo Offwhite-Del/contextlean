@@ -1,7 +1,7 @@
 {
   "name": "contextlean",
-  "version": "0.1.0",
-  "description": "Audit and safely reduce avoidable context and configuration overhead in local AI agent environments.",
+  "version": "0.2.0",
+  "description": "Audit, evaluate, and safely optimize controllable context in local AI agent environments.",
   "author": {
     "name": "Offwhite-Del",
     "url": "https://github.com/Offwhite-Del"

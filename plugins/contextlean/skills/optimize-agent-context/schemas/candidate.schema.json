@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextlean.dev/schemas/candidate.schema.json",
+  "title": "ContextLean bounded optimization candidates",
+  "type": "object",
+  "required": ["schema", "generatedAt", "tool", "experiment", "snapshotSha256", "target", "variants", "generator", "privacy", "candidateSha256"],
+  "properties": {
+    "schema": { "const": "contextlean.candidate/v1" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "tool": { "type": "string", "minLength": 1 },
+    "experiment": {
+      "type": "object",
+      "required": ["path", "sha256", "experimentSha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "experimentSha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "snapshotSha256": { "$ref": "#/$defs/sha256" },
+    "target": {
+      "type": "object",
+      "required": ["root", "path", "kind", "expectedSha256", "baselineContent", "baselineContentSha256"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "expectedSha256": { "$ref": "#/$defs/sha256" },
+        "baselineContent": { "type": "string", "maxLength": 1000000 },
+        "baselineContentSha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["id", "rationale", "content", "contentSha256", "bytes", "approximateTokens", "preservedInvariantIds"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" },
+          "rationale": { "type": "string", "minLength": 1, "maxLength": 8000 },
+          "content": { "type": "string", "minLength": 1, "maxLength": 1000000 },
+          "contentSha256": { "$ref": "#/$defs/sha256" },
+          "bytes": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+          "approximateTokens": { "type": "integer", "minimum": 1 },
+          "preservedInvariantIds": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "generator": {
+      "type": "object",
+      "required": ["adapterSpecSha256", "executableFingerprint", "bindingSha256", "environmentPolicy", "heldOutTasksDisclosed"],
+      "properties": {
+        "adapterSpecSha256": { "$ref": "#/$defs/sha256" },
+        "executableFingerprint": { "$ref": "#/$defs/executableFingerprint" },
+        "bindingSha256": { "$ref": "#/$defs/sha256" },
+        "environmentPolicy": { "type": "string", "minLength": 1 },
+        "heldOutTasksDisclosed": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "privacy": {
+      "type": "object",
+      "required": ["artifactProtection", "sensitivePatternsDetected", "authOrTranscriptContentIncluded"],
+      "properties": {
+        "artifactProtection": { "enum": ["posix-0600", "platform-inherited-acl"] },
+        "sensitivePatternsDetected": { "const": false },
+        "authOrTranscriptContentIncluded": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "candidateSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "executableFingerprint": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["argvIndex", "sha256"],
+        "properties": {
+          "argvIndex": { "type": "integer", "minimum": 0 },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
