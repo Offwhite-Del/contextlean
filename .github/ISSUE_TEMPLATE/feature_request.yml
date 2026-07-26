@@ -1,0 +1,46 @@
+name: Feature request / 功能建议
+description: Propose a bounded, testable improvement / 提议范围明确、可测试的改进
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ContextLean stays local-only, zero-telemetry, runtime-dependency-free, and read-only by default. Please explain the real workflow before proposing a new abstraction.
+
+        ContextLean 保持本地运行、零遥测、运行时零依赖并默认只读。提出新抽象前，请先说明真实工作流。
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / 问题
+      description: What concrete Agent workflow is slow, noisy, unsafe, or hard to verify?
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current workaround / 现有做法
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome / 建议结果
+      description: Describe behavior and acceptance criteria, not only an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and validation / 证据与验证
+      description: How can the improvement be measured without exposing private data?
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Project boundaries / 项目边界
+      options:
+        - label: The proposal does not require telemetry, private transcript access, or an always-on service. / 建议不需要遥测、私人会话访问或常驻服务。
+          required: true
