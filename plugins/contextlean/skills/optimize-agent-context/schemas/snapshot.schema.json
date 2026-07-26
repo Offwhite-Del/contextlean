@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextlean.dev/schemas/snapshot.schema.json",
+  "title": "ContextLean metadata-only snapshot",
+  "type": "object",
+  "required": ["schema", "generatedAt", "tool", "root", "scope", "surfaces", "metrics", "privacy", "snapshotSha256"],
+  "properties": {
+    "schema": { "const": "contextlean.snapshot/v2" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "tool": { "type": "string" },
+    "root": { "type": "string" },
+    "scope": { "enum": ["repo", "home", "all"] },
+    "surfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "loadMode", "mutability", "evidence", "contentIncluded"],
+        "properties": {
+          "id": { "type": "string" },
+          "kind": { "type": "string" },
+          "loadMode": { "type": "string" },
+          "mutability": { "type": "string" },
+          "path": { "type": "string" },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "bytes": { "type": "integer", "minimum": 0 },
+          "evidence": { "type": "string" },
+          "contentIncluded": { "const": false }
+        },
+        "additionalProperties": true
+      }
+    },
+    "metrics": { "type": "object" },
+    "privacy": {
+      "type": "object",
+      "required": ["contentIncluded", "authFilesRead", "envFilesRead", "sessionTranscriptsRead", "secretValuesIncluded"],
+      "properties": {
+        "contentIncluded": { "const": false },
+        "authFilesRead": { "const": false },
+        "envFilesRead": { "const": false },
+        "sessionTranscriptsRead": { "const": false },
+        "secretValuesIncluded": { "const": false }
+      }
+    },
+    "snapshotSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "additionalProperties": true
+}

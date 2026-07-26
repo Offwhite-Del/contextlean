@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextlean.dev/schemas/selection.schema.json",
+  "title": "ContextLean quality-first selection report",
+  "type": "object",
+  "required": ["schema", "status", "experimentSha256", "candidateSha256", "resultSha256", "selectedCandidateId", "candidates", "planPrepared", "selectionSha256"],
+  "properties": {
+    "schema": { "const": "contextlean.selection/v1" },
+    "status": { "enum": ["selected", "no_promotion", "human_review_required"] },
+    "experimentSha256": { "$ref": "#/$defs/sha256" },
+    "candidateSha256": { "$ref": "#/$defs/sha256" },
+    "resultSha256": { "$ref": "#/$defs/sha256" },
+    "selectedCandidateId": { "type": ["string", "null"] },
+    "candidates": { "type": "array" },
+    "planPrepared": { "type": "boolean" },
+    "selectionSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": { "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } },
+  "additionalProperties": true
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextlean.dev/schemas/sandbox-receipt.schema.json",
+  "title": "ContextLean sandbox qualification receipt",
+  "type": "object",
+  "required": ["schema", "qualified", "backend", "policySha256"],
+  "properties": {
+    "schema": { "const": "contextlean.sandbox-receipt/v1" },
+    "qualified": { "const": true },
+    "backend": { "type": "string", "minLength": 1 },
+    "policySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "additionalProperties": true
+}

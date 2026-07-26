@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextlean.dev/schemas/result.schema.json",
+  "title": "ContextLean experiment result",
+  "type": "object",
+  "required": ["schema", "generatedAt", "tool", "experiment", "candidate", "taskCount", "heldOutTaskCount", "bindings", "baselineRuns", "candidates", "privacy", "resultSha256"],
+  "properties": {
+    "schema": { "const": "contextlean.result/v1" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "tool": { "type": "string", "minLength": 1 },
+    "experiment": { "type": "object" },
+    "candidate": { "type": "object" },
+    "taskCount": { "type": "integer", "minimum": 1 },
+    "heldOutTaskCount": { "type": "integer", "minimum": 0 },
+    "bindings": {
+      "type": "object",
+      "required": ["runner", "judge"],
+      "properties": {
+        "runner": { "$ref": "#/$defs/binding" },
+        "judge": { "$ref": "#/$defs/binding" }
+      },
+      "additionalProperties": false
+    },
+    "baselineRuns": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/run" } },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["id", "runs", "judgments"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" },
+          "runs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/run" } },
+          "judgments": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/judgment" } }
+        },
+        "additionalProperties": false
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "required": ["rawOutputsPersisted", "outputHashesPersisted", "authOrTranscriptContentIncluded"],
+      "properties": {
+        "rawOutputsPersisted": { "const": false },
+        "outputHashesPersisted": { "const": true },
+        "authOrTranscriptContentIncluded": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "resultSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "binding": {
+      "type": "object",
+      "required": ["role", "adapterSpecSha256", "executableFingerprint", "sandboxReceiptSha256", "sandboxBackend", "sandboxPolicySha256", "environmentPolicy", "bindingSha256"],
+      "properties": {
+        "role": { "enum": ["runner", "judge"] },
+        "adapterSpecSha256": { "$ref": "#/$defs/sha256" },
+        "executableFingerprint": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["argvIndex", "sha256"],
+            "properties": {
+              "argvIndex": { "type": "integer", "minimum": 0 },
+              "sha256": { "$ref": "#/$defs/sha256" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "sandboxReceiptSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "sandboxBackend": { "type": ["string", "null"] },
+        "sandboxPolicySha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "environmentPolicy": { "type": "string", "minLength": 1 },
+        "bindingSha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "environment": {
+      "type": "object",
+      "required": ["model", "reasoning", "sessionPersistence", "toolPolicy"],
+      "properties": {
+        "model": { "type": "string", "minLength": 1 },
+        "reasoning": { "type": "string", "minLength": 1 },
+        "sessionPersistence": { "const": false },
+        "toolPolicy": { "const": "per-task-allowlist" }
+      },
+      "additionalProperties": false
+    },
+    "run": {
+      "type": "object",
+      "required": ["taskId", "category", "heldOut", "measureLatency", "repetition", "executionIndex", "deterministicPass", "checks", "success", "outputSha256", "metrics", "sideEffects", "sandbox", "environment", "adapterBindingSha256"],
+      "properties": {
+        "taskId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,127}$" },
+        "category": { "type": "string", "minLength": 1 },
+        "heldOut": { "type": "boolean" },
+        "measureLatency": { "type": "boolean" },
+        "repetition": { "type": "integer", "minimum": 1 },
+        "executionIndex": { "type": "integer", "minimum": 1 },
+        "deterministicPass": { "type": "boolean" },
+        "checks": { "type": "array" },
+        "success": { "type": "boolean" },
+        "outputSha256": { "$ref": "#/$defs/sha256" },
+        "metrics": { "type": "object" },
+        "sideEffects": { "type": "object" },
+        "sandbox": { "type": "object" },
+        "environment": { "$ref": "#/$defs/environment" },
+        "adapterBindingSha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "judgment": {
+      "type": "object",
+      "required": ["taskId", "candidateId", "verdict", "rationaleSha256", "rationaleBytes", "adapterBindingSha256"],
+      "properties": {
+        "taskId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,127}$" },
+        "candidateId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" },
+        "verdict": { "enum": ["candidate", "baseline", "tie"] },
+        "rationaleSha256": { "$ref": "#/$defs/sha256" },
+        "rationaleBytes": { "type": "integer", "minimum": 1, "maximum": 8000 },
+        "adapterBindingSha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

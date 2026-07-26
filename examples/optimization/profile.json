@@ -1,0 +1,53 @@
+{
+  "schema": "contextlean.profile/v1",
+  "invariants": [
+    {
+      "id": "current-canonical-wins",
+      "description": "Current canonical files and live evidence outrank memory or summaries."
+    },
+    {
+      "id": "privacy-and-credentials",
+      "description": "Do not expose credentials, login state, private sessions, or sensitive user content."
+    },
+    {
+      "id": "external-write-approval",
+      "description": "Require explicit authority before external writes or account-level changes."
+    },
+    {
+      "id": "destructive-action-approval",
+      "description": "Resolve targets and require confirmation before destructive actions."
+    },
+    {
+      "id": "dirty-worktree-protection",
+      "description": "Preserve unrelated and uncommitted user changes."
+    },
+    {
+      "id": "network-node-stability",
+      "description": "Do not change VPN or proxy selector state without explicit approval and restoration."
+    },
+    {
+      "id": "model-reasoning-stability",
+      "description": "Do not change the selected model or reasoning level as part of context optimization."
+    }
+  ],
+  "objectives": [
+    "Improve task quality or preserve it while reducing avoidable context, tool loops, or latency.",
+    "Prefer on-demand, source-backed context over repeated always-on prose.",
+    "Do not promote a candidate without deterministic evidence and blind review."
+  ],
+  "qualityGates": {
+    "requiredCategoryPasses": {
+      "instruction": 6,
+      "skill_positive": 6,
+      "skill_negative": 6,
+      "context_pack": 6
+    },
+    "minBlindNonInferior": 20,
+    "maxBlindLosses": 2,
+    "minBlindNetWins": 4,
+    "minInputTokenImprovementPct": 5,
+    "minToolImprovementPct": 10,
+    "minLatencyImprovementPct": 10,
+    "maxOtherRegressionPct": 10
+  }
+}

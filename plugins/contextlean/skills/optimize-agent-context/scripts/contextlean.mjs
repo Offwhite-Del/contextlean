@@ -5,8 +5,24 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import {
+  V2_VERSION,
+  createSnapshot,
+  generateCandidates,
+  initExperiment,
+  renderContextPack,
+  runExperiment,
+  selectExperiment,
+  validateContextPack,
+  writeCandidates,
+  writeExperiment,
+  writeExperimentResult,
+  writeRenderedPack,
+  writeSelection,
+  writeSnapshot,
+} from "./optimization.mjs";
 
-export const VERSION = "0.1.0";
+export const VERSION = V2_VERSION;
 
 const INSTRUCTION_NAMES = new Set([
   "AGENTS.md",
@@ -33,6 +49,8 @@ const NEVER_READ = new Set([
   ".env.production",
   "credentials.json",
 ]);
+const MAX_JSON_ARTIFACT_BYTES = 8_000_000;
+const DISALLOWED_REPLACEMENT_CONTROLS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/;
 
 class UsageError extends Error {}
 
@@ -41,28 +59,81 @@ function sha256(value) {
 }
 
 export function sha256File(filePath) {
-  return sha256(fs.readFileSync(filePath));
+  const safeFile = resolveSafeRegularRead(filePath);
+  return sha256(fs.readFileSync(safeFile.resolved));
 }
 
 function timestamp() {
   return new Date().toISOString().replace(/[:.]/g, "-");
 }
 
-function readText(filePath, maxBytes = 2_000_000) {
-  const stat = fs.lstatSync(filePath);
-  if (!stat.isFile() || stat.isSymbolicLink()) {
+function sensitiveReadPathFinding(filePath) {
+  const normalized = filePath.replaceAll("\\", "/").toLowerCase();
+  const segments = normalized.split("/").filter(Boolean);
+  const basename = segments.at(-1) || "";
+  const sensitiveDirectories = new Set([
+    ".ssh",
+    ".gnupg",
+    ".aws",
+    ".azure",
+    ".kube",
+    ".docker",
+    ".chatgpt",
+    "keychains",
+  ]);
+  const privateAgentTree = segments.some((segment, index) => (
+    (segment === ".codex" && ["sessions", "history", "logs"].includes(segments[index + 1]))
+    || (segment === ".claude" && ["projects", "sessions", "history", "logs"].includes(segments[index + 1]))
+  ));
+  const sensitiveSegment = segments.find((segment) => (
+    segment === ".env"
+    || segment.startsWith(".env.")
+    || segment === ".envrc"
+    || [".netrc", ".npmrc", ".pypirc"].includes(segment)
+    || sensitiveDirectories.has(segment)
+    || /(?:^|[._-])(?:auth|authentication|credentials?|secrets?|tokens?|sessions?|transcripts?|conversations?|chats?)(?:[._-]|$)/.test(segment)
+  ));
+  const privateKeyName = /^(?:id_rsa|id_ed25519|private[_-]?key)(?:\.|$)/.test(basename);
+  const sensitiveExtension = /\.(?:key|pem|p12|pfx|cer|crt|der|jks)$/.test(basename);
+  return sensitiveSegment || privateAgentTree || privateKeyName || sensitiveExtension ? "sensitive-path-category" : null;
+}
+
+function resolveSafeRegularRead(filePath, maxBytes = 2_000_000) {
+  const requested = path.resolve(filePath);
+  if (sensitiveReadPathFinding(requested) || NEVER_READ.has(path.basename(requested).toLowerCase())) {
+    throw new UsageError(`Refusing sensitive file path: ${filePath}`);
+  }
+  let requestedStat;
+  let resolved;
+  let resolvedStat;
+  try {
+    requestedStat = fs.lstatSync(requested);
+    resolved = fs.realpathSync(requested);
+    resolvedStat = fs.statSync(resolved);
+  } catch {
     throw new UsageError(`Refusing non-regular file: ${filePath}`);
   }
-  if (stat.size > maxBytes) {
+  if (!requestedStat.isFile() || requestedStat.isSymbolicLink() || !resolvedStat.isFile()) {
+    throw new UsageError(`Refusing non-regular file: ${filePath}`);
+  }
+  if (sensitiveReadPathFinding(resolved) || NEVER_READ.has(path.basename(resolved).toLowerCase())) {
+    throw new UsageError(`Refusing sensitive resolved file path: ${filePath}`);
+  }
+  if (resolvedStat.size > maxBytes) {
     throw new UsageError(`File exceeds ${maxBytes} byte safety limit: ${filePath}`);
   }
-  return fs.readFileSync(filePath, "utf8");
+  return { resolved, stat: resolvedStat };
+}
+
+function readText(filePath, maxBytes = 2_000_000) {
+  const safeFile = resolveSafeRegularRead(filePath, maxBytes);
+  return fs.readFileSync(safeFile.resolved, "utf8");
 }
 
 function existingRegularFile(filePath) {
   try {
-    const stat = fs.lstatSync(filePath);
-    return stat.isFile() && !stat.isSymbolicLink() && !NEVER_READ.has(path.basename(filePath).toLowerCase());
+    resolveSafeRegularRead(filePath);
+    return true;
   } catch {
     return false;
   }
@@ -394,9 +465,9 @@ function atomicWrite(filePath, content) {
   fs.renameSync(temporary, filePath);
 }
 
-function readJson(filePath) {
+function readJson(filePath, maxBytes = 2_000_000) {
   try {
-    return JSON.parse(readText(filePath));
+    return JSON.parse(readText(filePath, maxBytes));
   } catch (error) {
     if (error instanceof UsageError) throw error;
     throw new UsageError(`Invalid JSON: ${filePath}`);
@@ -404,13 +475,14 @@ function readJson(filePath) {
 }
 
 function writeJson(filePath, value) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+  if (process.platform !== "win32") fs.chmodSync(filePath, 0o600);
 }
 
 export function applyPlan(planPath, options = {}) {
   if (!options.yes) throw new UsageError("Apply requires --yes after reviewing the complete plan.");
-  const plan = readJson(path.resolve(planPath));
+  const plan = readJson(path.resolve(planPath), MAX_JSON_ARTIFACT_BYTES);
   if (plan.schemaVersion !== 1 || !Array.isArray(plan.operations) || !plan.operations.length) {
     throw new UsageError("Plan must use schemaVersion 1 and contain at least one operation.");
   }
@@ -418,14 +490,21 @@ export function applyPlan(planPath, options = {}) {
   const seenPaths = new Set();
   const prepared = plan.operations.map((operation) => {
     if (operation.type !== "replace" || typeof operation.content !== "string") {
-      throw new UsageError("Version 0.1 supports replace operations with string content only.");
+      throw new UsageError("ContextLean supports replace operations with string content only.");
     }
     if (Buffer.byteLength(operation.content) > 1_000_000) {
       throw new UsageError(`Replacement exceeds 1 MB: ${operation.path}`);
     }
+    if (DISALLOWED_REPLACEMENT_CONTROLS.test(operation.content)) {
+      throw new UsageError(`Replacement contains unsupported control characters: ${operation.path}`);
+    }
+    const replacementSha256 = sha256(operation.content);
+    if (operation.contentSha256 !== undefined && operation.contentSha256 !== replacementSha256) {
+      throw new UsageError(`Replacement content hash mismatch: ${operation.path}`);
+    }
     const target = resolveInside(root, operation.path);
     if (!allowedReplacementPath(operation.path)) {
-      throw new UsageError(`Replace is limited to known instruction files and SKILL.md in version 0.1: ${operation.path}`);
+      throw new UsageError(`Replace is limited to known instruction files and SKILL.md: ${operation.path}`);
     }
     if (seenPaths.has(target)) throw new UsageError(`Duplicate operation path: ${operation.path}`);
     seenPaths.add(target);
@@ -434,16 +513,17 @@ export function applyPlan(planPath, options = {}) {
     if (beforeHash !== operation.expectedSha256) {
       throw new UsageError(`Hash mismatch for ${operation.path}; refusing stale plan.`);
     }
-    return { operation, target, beforeHash, afterHash: sha256(operation.content) };
+    return { operation, target, beforeHash, afterHash: replacementSha256 };
   });
 
-  const id = timestamp();
+  const id = `${timestamp()}-${crypto.randomBytes(4).toString("hex")}`;
   const backupRoot = path.join(root, ".contextlean", "backups", id);
   const receiptPath = path.join(backupRoot, "receipt.json");
   const withBackups = prepared.map((item) => {
     const backupPath = path.join(backupRoot, "files", item.operation.path);
     fs.mkdirSync(path.dirname(backupPath), { recursive: true });
     fs.copyFileSync(item.target, backupPath);
+    if (process.platform !== "win32") fs.chmodSync(backupPath, 0o600);
     return { ...item, backupPath };
   });
   const receiptFor = (status) => ({
@@ -538,7 +618,7 @@ function parseArguments(argv) {
       continue;
     }
     const [rawKey, inline] = value.slice(2).split(/=(.*)/s, 2);
-    if (["yes", "json", "strict"].includes(rawKey)) {
+    if (["yes", "json", "strict", "allow-candidate"].includes(rawKey)) {
       options[rawKey] = true;
       continue;
     }
@@ -565,15 +645,66 @@ function printAudit(report) {
 }
 
 function help() {
-  console.log(`ContextLean ${VERSION}\n\nUsage:\n  contextlean audit [--root PATH] [--scope repo|home|all] [--json]\n  contextlean doctor [--root PATH] [--home PATH] [--json]\n  contextlean plan [--root PATH] [--scope repo|home|all] [--write FILE]\n  contextlean apply --plan FILE --yes [--root PATH]\n  contextlean verify --receipt FILE [--json]\n  contextlean rollback --receipt FILE --yes\n\nSafety:\n  Audit is read-only. Apply accepts hash-guarded replace operations only, creates backups,\n  and refuses source files, symlinks, stale plans, auth files, path escapes, and files over 1 MB.\n  Version 0.1 applies only to known instruction files and SKILL.md.`);
+  console.log(`ContextLean ${VERSION}\n\nUsage:\n  contextlean audit [--root PATH] [--scope repo|home|all] [--json]\n  contextlean doctor [--root PATH] [--home PATH] [--json]\n  contextlean snapshot --root PATH --scope repo|home|all --write FILE\n  contextlean plan [--root PATH] [--scope repo|home|all] [--write FILE]\n  contextlean experiment init --snapshot FILE --tasks FILE --profile FILE --model NAME --reasoning LEVEL --write FILE\n  contextlean experiment generate --experiment FILE --adapter FILE --target PATH --write FILE\n  contextlean experiment run --experiment FILE --candidate FILE --runner FILE --judge FILE --write FILE\n  contextlean experiment select --experiment FILE --candidate FILE --result FILE --report FILE [--write-plan FILE]\n  contextlean pack validate --manifest FILE --source-versions FILE --root PATH --permission-fingerprint VALUE --parser-version VALUE --content-schema-version VALUE --prompt-sha256 SHA [--json]\n  contextlean pack render --manifest FILE --source-versions FILE --root PATH --permission-fingerprint VALUE --parser-version VALUE --content-schema-version VALUE --prompt-sha256 SHA --write FILE [--allow-candidate]\n  contextlean apply --plan FILE --yes [--root PATH]\n  contextlean verify --receipt FILE [--json]\n  contextlean rollback --receipt FILE --yes\n\nSafety:\n  Snapshot is metadata-only. Adapter specs use absolute argv arrays and never contain credentials.\n  Experiment artifacts are private local files. Select never applies a candidate automatically.\n  Apply accepts hash-guarded replace operations only, creates backups, and refuses source files,\n  symlinks, stale plans, auth files, path escapes, and files over 1 MB.`);
+}
+
+function requireOption(options, name, command) {
+  if (!options[name]) throw new UsageError(`${command} requires --${name}.`);
+  return options[name];
+}
+
+function packOptions(options, command) {
+  const required = ["manifest", "source-versions", "permission-fingerprint", "parser-version", "content-schema-version", "prompt-sha256"];
+  for (const name of required) requireOption(options, name, command);
+  return {
+    manifestPath: options.manifest,
+    sourceVersionsPath: options["source-versions"],
+    root: options.root,
+    permissionFingerprint: options["permission-fingerprint"],
+    parserVersion: options["parser-version"],
+    contentSchemaVersion: options["content-schema-version"],
+    promptSha256: options["prompt-sha256"],
+    allowCandidate: options["allow-candidate"] === true,
+  };
+}
+
+function publicPackValidation(validation) {
+  return {
+    schema: validation.schema,
+    manifestPath: validation.manifestPath,
+    root: validation.root,
+    sourceVersions: validation.sourceVersions,
+    ok: validation.ok,
+    status: validation.status,
+    staleReasons: validation.staleReasons,
+    humanReviewStatus: validation.humanReviewStatus,
+    metrics: validation.metrics,
+    chunks: validation.renderedChunks.map((chunk) => ({
+      id: chunk.id,
+      sourcePath: chunk.sourcePath,
+      startLine: chunk.startLine,
+      endLine: chunk.endLine,
+      contentSha256: chunk.contentSha256,
+    })),
+  };
 }
 
 export async function main(argv = process.argv.slice(2)) {
   try {
+    if (argv.length === 1 && ["--version", "-v"].includes(argv[0])) return console.log(VERSION);
+    if (argv.length === 1 && ["--help", "-h"].includes(argv[0])) return help();
     const { positional, options } = parseArguments(argv);
     const command = positional[0] || "help";
     if (["help", "--help", "-h"].includes(command)) return help();
     if (["version", "--version", "-v"].includes(command)) return console.log(VERSION);
+    if (command === "snapshot") {
+      const report = auditEnvironment({ root: options.root, home: options.home, scope: options.scope || "repo" });
+      const snapshot = createSnapshot({ root: report.root, home: options.home, scope: report.scope, auditReport: report });
+      const destination = requireOption(options, "write", "Snapshot");
+      const written = writeSnapshot(snapshot, destination);
+      console.log(`Metadata-only snapshot written: ${written}`);
+      return;
+    }
     if (command === "audit" || command === "doctor" || command === "plan") {
       const report = auditEnvironment({
         root: options.root,
@@ -597,6 +728,75 @@ export async function main(argv = process.argv.slice(2)) {
       console.log(options.json ? JSON.stringify(result, null, 2) : `Applied safely. Receipt: ${result.receiptPath}`);
       return;
     }
+    if (command === "experiment") {
+      const subcommand = positional[1];
+      if (subcommand === "init") {
+        const experiment = initExperiment({
+          snapshotPath: requireOption(options, "snapshot", "Experiment init"),
+          tasksPath: requireOption(options, "tasks", "Experiment init"),
+          profilePath: requireOption(options, "profile", "Experiment init"),
+          model: requireOption(options, "model", "Experiment init"),
+          reasoning: requireOption(options, "reasoning", "Experiment init"),
+          repetitions: options.repetitions,
+        });
+        const written = writeExperiment(experiment, requireOption(options, "write", "Experiment init"));
+        console.log(`Experiment manifest written: ${written}`);
+        return;
+      }
+      if (subcommand === "generate") {
+        const candidate = generateCandidates({
+          experimentPath: requireOption(options, "experiment", "Experiment generate"),
+          adapterPath: requireOption(options, "adapter", "Experiment generate"),
+          targetPath: requireOption(options, "target", "Experiment generate"),
+        });
+        const written = writeCandidates(candidate, requireOption(options, "write", "Experiment generate"));
+        console.log(`Candidate artifact written: ${written}`);
+        return;
+      }
+      if (subcommand === "run") {
+        const result = runExperiment({
+          experimentPath: requireOption(options, "experiment", "Experiment run"),
+          candidatePath: requireOption(options, "candidate", "Experiment run"),
+          runnerPath: requireOption(options, "runner", "Experiment run"),
+          judgePath: requireOption(options, "judge", "Experiment run"),
+        });
+        const written = writeExperimentResult(result, requireOption(options, "write", "Experiment run"));
+        console.log(`Experiment result written: ${written}`);
+        return;
+      }
+      if (subcommand === "select") {
+        const selection = selectExperiment({
+          experimentPath: requireOption(options, "experiment", "Experiment select"),
+          candidatePath: requireOption(options, "candidate", "Experiment select"),
+          resultPath: requireOption(options, "result", "Experiment select"),
+        });
+        const written = writeSelection(selection, requireOption(options, "report", "Experiment select"), options["write-plan"]);
+        console.log(selection.plan
+          ? `Selected ${selection.report.selectedCandidateId}. Report: ${written.reportPath}; plan: ${written.planPath || "not requested"}`
+          : `No plan written (${selection.report.status}). Report: ${written.reportPath}`);
+        return;
+      }
+      throw new UsageError(`Unknown experiment subcommand: ${subcommand || "<missing>"}`);
+    }
+    if (command === "pack") {
+      const subcommand = positional[1];
+      if (subcommand === "validate") {
+        const shared = packOptions(options, "Pack validate");
+        const validation = validateContextPack(shared);
+        const publicResult = publicPackValidation(validation);
+        console.log(options.json ? JSON.stringify(publicResult, null, 2) : `${validation.ok ? "CURRENT" : "STALE"}: ${validation.metrics.chunks} chunks, ~${validation.metrics.approximateTokens} tokens${validation.staleReasons.length ? ` (${validation.staleReasons.join(", ")})` : ""}`);
+        if (!validation.ok) process.exitCode = 1;
+        return;
+      }
+      if (subcommand === "render") {
+        const shared = packOptions(options, "Pack render");
+        const rendered = renderContextPack(shared);
+        const written = writeRenderedPack(rendered, requireOption(options, "write", "Pack render"));
+        console.log(`Context Pack rendered privately: ${written}`);
+        return;
+      }
+      throw new UsageError(`Unknown pack subcommand: ${subcommand || "<missing>"}`);
+    }
     if (command === "verify") {
       if (!options.receipt) throw new UsageError("Verify requires --receipt FILE.");
       const result = verifyReceipt(options.receipt, { root: options.root, home: options.home });
@@ -613,7 +813,7 @@ export async function main(argv = process.argv.slice(2)) {
     throw new UsageError(`Unknown command: ${command}`);
   } catch (error) {
     console.error(`ContextLean error: ${error.message}`);
-    process.exitCode = error instanceof UsageError ? 2 : 1;
+    process.exitCode = error instanceof UsageError || error?.name === "UsageError" ? 2 : 1;
   }
 }
 

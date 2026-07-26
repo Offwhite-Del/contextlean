@@ -27,6 +27,29 @@ function write(filePath, content) {
   fs.writeFileSync(filePath, content);
 }
 
+test("plan and receipt readers reject sensitive paths before JSON handling", () => {
+  const { base } = fixture();
+  const envrcPlan = path.join(base, ".envrc");
+  const transcriptReceipt = path.join(base, ".claude", "projects", "private-thread.json");
+  write(envrcPlan, JSON.stringify({ schemaVersion: 1, operations: [] }));
+  write(transcriptReceipt, JSON.stringify({ schemaVersion: 1, operations: [] }));
+
+  assert.throws(() => applyPlan(envrcPlan, { yes: true }), /sensitive file path/);
+  assert.throws(() => verifyReceipt(transcriptReceipt), /sensitive file path/);
+  assert.throws(() => sha256File(envrcPlan), /sensitive file path/);
+});
+
+test("receipt readers reject parent symlinks into private agent trees", { skip: process.platform === "win32" }, () => {
+  const { base, root } = fixture();
+  const privateDirectory = path.join(base, ".claude", "projects");
+  const privateReceipt = path.join(privateDirectory, "private-thread.json");
+  const safeAlias = path.join(base, "reviewed-receipts");
+  write(privateReceipt, JSON.stringify({ schemaVersion: 1, root, operations: [] }));
+  fs.symlinkSync(privateDirectory, safeAlias, "dir");
+
+  assert.throws(() => verifyReceipt(path.join(safeAlias, "private-thread.json")), /sensitive resolved file path/);
+});
+
 test("audit finds duplicate context, idle hooks, and cross-vendor keys without leaking values", () => {
   const { root, home } = fixture();
   const repeated = "Keep deterministic constraints in tests and schemas instead of repeating them in prompts.";
@@ -90,6 +113,11 @@ test("apply is hash-guarded, verifies, and rolls back exactly", () => {
   const applied = applyPlan(planPath, { yes: true });
   assert.equal(fs.readFileSync(target, "utf8"), after);
   assert.equal(verifyReceipt(applied.receiptPath, { home }).ok, true);
+  if (process.platform !== "win32") {
+    assert.equal(fs.statSync(applied.receiptPath).mode & 0o777, 0o600);
+    const backupPath = path.join(root, applied.receipt.operations[0].backupPath);
+    assert.equal(fs.statSync(backupPath).mode & 0o777, 0o600);
+  }
 
   const rolledBack = rollbackReceipt(applied.receiptPath, { yes: true });
   assert.equal(rolledBack.receipt.status, "rolled_back");
@@ -108,6 +136,27 @@ test("apply refuses a stale plan", () => {
   }));
 
   assert.throws(() => applyPlan(planPath, { yes: true }), /Hash mismatch/);
+  assert.equal(fs.readFileSync(target, "utf8"), "# Current\n");
+});
+
+test("apply refuses a mismatched optional replacement content hash", () => {
+  const { root } = fixture();
+  const target = path.join(root, "AGENTS.md");
+  write(target, "# Current\n");
+  const planPath = path.join(root, "plan.json");
+  write(planPath, JSON.stringify({
+    schemaVersion: 1,
+    root,
+    operations: [{
+      type: "replace",
+      path: "AGENTS.md",
+      expectedSha256: sha256File(target),
+      contentSha256: "0".repeat(64),
+      content: "# Changed\n",
+    }],
+  }));
+
+  assert.throws(() => applyPlan(planPath, { yes: true }), /content hash mismatch/);
   assert.equal(fs.readFileSync(target, "utf8"), "# Current\n");
 });
 

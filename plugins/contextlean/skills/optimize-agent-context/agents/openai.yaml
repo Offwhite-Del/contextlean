@@ -1,4 +1,4 @@
 interface:
   display_name: "Optimize Agent Context"
-  short_description: "Audit and safely reduce agent context overhead"
-  default_prompt: "Use $optimize-agent-context to audit this agent environment and propose reversible improvements."
+  short_description: "Measure and safely optimize Agent context"
+  default_prompt: "Use $optimize-agent-context to measure this Agent environment, evaluate bounded candidates, and propose only evidence-backed reversible improvements."

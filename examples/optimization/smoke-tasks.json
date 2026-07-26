@@ -1,0 +1,65 @@
+{
+  "schema": "contextlean.tasks/v1",
+  "tasks": [
+    {
+      "id": "smoke-exact-response",
+      "category": "instruction",
+      "prompt": "Reply with exactly CONTEXT_SIMPLE_OK.",
+      "dataClass": "non_sensitive",
+      "heldOut": false,
+      "allowedTools": [],
+      "assertions": { "success": true, "outputEquals": "CONTEXT_SIMPLE_OK", "exactToolCalls": 0 },
+      "measureLatency": true
+    },
+    {
+      "id": "smoke-read-only-state",
+      "category": "instruction",
+      "prompt": "Read the provided canonical state fixture without modifying it and return STATE_READ_OK.",
+      "dataClass": "non_sensitive",
+      "heldOut": false,
+      "allowedTools": ["read_file"],
+      "assertions": { "success": true, "outputEquals": "STATE_READ_OK", "exactToolCalls": 1 },
+      "measureLatency": true
+    },
+    {
+      "id": "smoke-one-tool-call",
+      "category": "instruction",
+      "prompt": "Use exactly one allowed tool call and return ONE_TOOL_OK.",
+      "dataClass": "non_sensitive",
+      "heldOut": false,
+      "allowedTools": ["pwd"],
+      "assertions": { "success": true, "outputEquals": "ONE_TOOL_OK", "exactToolCalls": 1 },
+      "measureLatency": true
+    },
+    {
+      "id": "smoke-skill-positive",
+      "category": "skill_positive",
+      "prompt": "Audit excessive Agent context and propose a reversible measured optimization.",
+      "dataClass": "non_sensitive",
+      "heldOut": false,
+      "allowedTools": [],
+      "assertions": { "success": true, "outputEquals": "SKILL_POSITIVE_OK" },
+      "measureLatency": false
+    },
+    {
+      "id": "smoke-skill-negative",
+      "category": "skill_negative",
+      "prompt": "Rename a local variable in a small function; no Agent context audit is needed.",
+      "dataClass": "non_sensitive",
+      "heldOut": false,
+      "allowedTools": [],
+      "assertions": { "success": true, "outputEquals": "SKILL_NEGATIVE_OK" },
+      "measureLatency": false
+    },
+    {
+      "id": "smoke-stale-pack",
+      "category": "context_pack",
+      "prompt": "Reject a derived Context Pack whose canonical source hash has changed.",
+      "dataClass": "non_sensitive",
+      "heldOut": false,
+      "allowedTools": [],
+      "assertions": { "success": true, "outputEquals": "STALE_PACK_REJECTED" },
+      "measureLatency": false
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextlean.dev/schemas/context-pack.schema.json",
+  "title": "ContextLean source-backed Context Pack",
+  "type": "object",
+  "required": ["schema", "packId", "projectId", "permissionFingerprint", "humanReviewStatus", "canonicalSources", "builder", "tokenBudget", "chunks"],
+  "properties": {
+    "schema": { "const": "contextlean.context-pack/v1" },
+    "packId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "projectId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "permissionFingerprint": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "humanReviewStatus": { "enum": ["candidate", "verified"] },
+    "canonicalSources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "required": ["id", "path", "sha256", "version"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" },
+          "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,127}$" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "builder": {
+      "type": "object",
+      "required": ["parserVersion", "contentSchemaVersion", "promptSha256"],
+      "properties": {
+        "parserVersion": { "type": "string" },
+        "contentSchemaVersion": { "type": "string" },
+        "promptSha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "tokenBudget": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "chunks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "required": ["id", "sourceId", "startLine", "endLine", "contentSha256"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+          "sourceId": { "type": "string" },
+          "startLine": { "type": "integer", "minimum": 1 },
+          "endLine": { "type": "integer", "minimum": 1 },
+          "contentSha256": { "$ref": "#/$defs/sha256" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": { "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } },
+  "additionalProperties": false
+}
