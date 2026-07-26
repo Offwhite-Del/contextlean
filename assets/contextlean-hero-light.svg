@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">ContextLean</title>
+  <desc id="desc">Measure, trim, verify, and roll back AI agent context safely.</desc>
+  <defs>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#0f766e"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
+    <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse"><path d="M36 0H0V36" fill="none" stroke="#0f172a" stroke-opacity=".04"/></pattern>
+  </defs>
+  <rect width="1200" height="420" rx="28" fill="#f7f4ed"/>
+  <rect width="1200" height="420" rx="28" fill="url(#grid)"/>
+  <g transform="translate(92 88)">
+    <rect width="232" height="232" rx="52" fill="#fffdf8" stroke="#0f766e" stroke-opacity=".28" stroke-width="2"/>
+    <path d="M48 152a78 78 0 0 1 136-52" fill="none" stroke="#cbd7df" stroke-width="18" stroke-linecap="round"/>
+    <path d="M48 152a78 78 0 0 1 104-69" fill="none" stroke="url(#accent)" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="116" cy="148" r="15" fill="#0f172a"/>
+    <path d="M116 148 161 105" stroke="#0f172a" stroke-width="10" stroke-linecap="round"/>
+    <path d="M72 184h88" stroke="#0f766e" stroke-width="8" stroke-linecap="round" opacity=".82"/>
+  </g>
+  <g transform="translate(380 98)">
+    <text x="0" y="78" fill="#0f172a" font-family="Avenir Next, ui-sans-serif, system-ui, sans-serif" font-size="62" font-weight="700" letter-spacing="-2">ContextLean</text>
+    <text x="2" y="132" fill="#405166" font-family="Avenir Next, ui-sans-serif, system-ui, sans-serif" font-size="19">A reversible doctor for AI agent context.</text>
+    <rect x="0" y="177" width="610" height="2" fill="url(#accent)" opacity=".65"/>
+    <text x="2" y="226" fill="#405166" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" letter-spacing=".3">MEASURE · TRIM · VERIFY · ROLL BACK</text>
+  </g>
+</svg>

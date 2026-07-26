@@ -1,6 +1,8 @@
-<div align="center">
-  <img src="assets/contextlean-hero.svg" alt="ContextLean — Measure. Trim. Verify. Roll back." width="100%">
-</div>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/contextlean-hero-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/contextlean-hero-light.svg">
+  <img src="assets/contextlean-hero-light.svg" alt="ContextLean — Measure. Trim. Verify. Roll back." width="100%">
+</picture>
 
 <div align="center">
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
@@ -57,6 +59,21 @@ node bin/contextlean.mjs doctor
 ```
 
 `audit` defaults to the current repository. `doctor` audits both repository and user-level Agent configuration. Neither command changes files.
+
+## See it work
+
+Running the read-only repository audit on ContextLean itself produces:
+
+```text
+ContextLean 0.1.0
+Scope: repo
+Instructions: 1 files, 499 bytes (~125 tokens)
+Skills: 0; enabled plugins: 0
+Privacy: no auth files, secret values, or session transcripts read
+Findings: none at current heuristic thresholds
+```
+
+The output reports measurements and heuristic findings, not a promise that every repository with no findings is optimally configured.
 
 ## Commands
 

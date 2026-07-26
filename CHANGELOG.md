@@ -8,7 +8,9 @@ All notable changes are documented here. / 重要版本变化记录在这里。
 
 - Reworked the English and Simplified Chinese repository presentation for full content parity.
 - Added community contribution files, structured issue forms, and a pull request template.
+- Added adaptive light/dark repository artwork and a reproducible audit-output example.
 - 增加中英文对等的仓库首页、社区协作文件、结构化 Issue 表单和 Pull Request 模板。
+- 增加自适应明暗主题的仓库视觉资产与可复现审计输出示例。
 
 ## [0.1.0] - 2026-07-26
 
