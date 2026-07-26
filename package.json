@@ -24,8 +24,10 @@
     "contextlean": "bin/contextlean.mjs"
   },
   "files": [
+    "assets/",
     "bin/",
     "plugins/",
+    "CHANGELOG.md",
     "README.md",
     "README.zh-CN.md",
     "LICENSE",

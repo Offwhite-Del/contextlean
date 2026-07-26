@@ -1,29 +1,42 @@
-# ContextLean
+<div align="center">
+  <img src="assets/contextlean-hero.svg" alt="ContextLean — Measure. Trim. Verify. Roll back." width="100%">
+</div>
 
-Local, reversible context and configuration doctor for AI Agent environments.
+<div align="center">
+  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
+</div>
 
-ContextLean helps ChatGPT/Codex, Claude Code, and other Agent Skills-compatible clients spend less time and context on duplicated instructions, irrelevant capabilities, idle hooks, and conflicting configuration. It optimizes the controllable Agent harness; it does not change the model or promise model-side inference acceleration.
+<div align="center">
+  <a href="https://github.com/Offwhite-Del/contextlean/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Offwhite-Del/contextlean/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/Offwhite-Del/contextlean/releases"><img alt="Release" src="https://img.shields.io/github/v/release/Offwhite-Del/contextlean?display_name=tag&sort=semver"></a>
+  <a href="LICENSE"><img alt="Apache-2.0 license" src="https://img.shields.io/github/license/Offwhite-Del/contextlean"></a>
+  <img alt="Node.js 18 or newer" src="https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white">
+</div>
 
-> Status: `0.1.0`. Read-only auditing and the hash-guarded apply/verify/rollback loop are implemented. The heuristics are intentionally conservative and pre-1.0.
+ContextLean is a local, reversible context and configuration doctor for AI coding agents. It helps Codex, ChatGPT Desktop, Claude Code, and other Agent Skills-compatible clients reduce avoidable harness overhead without pretending to accelerate the model provider itself.
+
+> **Status:** `v0.1.0` implements read-only audits and a hash-guarded plan/apply/verify/rollback loop. Its thresholds are conservative review heuristics, not universal quality limits.
+
+## Why ContextLean
+
+Agent performance is shaped by two different systems:
+
+| Layer | ContextLean can improve | ContextLean cannot change |
+| --- | --- | --- |
+| Local agent harness | Always-on instructions, discovered Skills, enabled plugins, idle hooks, cross-vendor configuration | — |
+| Model provider | — | Inference speed, capacity, routing, rate limits, or model capability |
+
+ContextLean makes the controllable layer measurable and reversible. A shorter prompt is accepted as an improvement only when representative tasks still pass.
 
 ## What it does
 
-- Measures known always-on instruction files without reading source code broadly.
-- Detects oversized instruction surfaces and exact repeated lines without printing their content.
-- Counts discovered Skills and enabled plugins within the selected scope.
-- Detects idle Codex hook loading and cross-vendor environment key names.
-- Produces an Agent-readable plan scaffold with source SHA-256 hashes.
-- Applies reviewed instruction/Skill replacement plans only after explicit `--yes` confirmation.
-- Creates local backups and receipts, verifies post-write hashes, and rolls back exactly.
-- Runs locally with zero telemetry and zero runtime dependencies beyond Node.js 18+.
+1. **Measure** known instruction surfaces without broadly reading source code.
+2. **Diagnose** oversized rules, exact duplicate lines, Skill/plugin load, idle Codex hooks, and cross-vendor environment key names.
+3. **Plan** reviewed replacements with source SHA-256 hashes.
+4. **Apply safely** only after explicit confirmation, with backups and receipts.
+5. **Verify or roll back** using exact post-write and backup hashes.
 
-## What it does not do
-
-- Read authentication files, keychains, `.env` files, or private Agent transcripts.
-- Upload prompts, configuration, source code, reports, or usage telemetry.
-- Delete files, install background services, enable hooks, or add MCP servers.
-- Automatically decide that shorter instructions are better.
-- Promise “100% model capability” or eliminate provider/network inference latency.
+Everything runs locally with zero telemetry and zero runtime dependencies beyond Node.js 18+.
 
 ## Quick start
 
@@ -34,7 +47,7 @@ npx --yes github:Offwhite-Del/contextlean audit --scope repo
 npx --yes github:Offwhite-Del/contextlean doctor
 ```
 
-Or clone and run locally:
+Or clone and verify locally:
 
 ```bash
 git clone https://github.com/Offwhite-Del/contextlean.git
@@ -43,7 +56,9 @@ npm test
 node bin/contextlean.mjs doctor
 ```
 
-Commands:
+`audit` defaults to the current repository. `doctor` audits both repository and user-level Agent configuration. Neither command changes files.
+
+## Commands
 
 ```text
 contextlean audit [--root PATH] [--scope repo|home|all] [--json]
@@ -54,11 +69,9 @@ contextlean verify --receipt FILE [--json]
 contextlean rollback --receipt FILE --yes
 ```
 
-`audit` defaults to the current repository. `doctor` audits both repository and user Agent configuration. Neither command mutates files.
+## Install as an Agent Skill
 
-## Install for ChatGPT Desktop and Codex
-
-Add this repository as a Codex marketplace:
+### ChatGPT Desktop and Codex
 
 ```bash
 codex plugin marketplace add Offwhite-Del/contextlean \
@@ -67,11 +80,9 @@ codex plugin marketplace add Offwhite-Del/contextlean \
 codex plugin add contextlean@contextlean
 ```
 
-Restart the ChatGPT desktop app or start a new Codex CLI session. Invoke the bundled Skill as `$optimize-agent-context`, or ask Codex to audit the Agent environment.
+Restart ChatGPT Desktop or open a new Codex CLI session, then invoke `$optimize-agent-context` or ask Codex to audit the Agent environment.
 
-The plugin uses the official `.codex-plugin/plugin.json` format and does not bundle hooks, MCP servers, connectors, or external authentication.
-
-## Install for Claude Code and Claude Code Desktop
+### Claude Code and Claude Code Desktop
 
 ```bash
 claude plugin marketplace add Offwhite-Del/contextlean \
@@ -79,82 +90,65 @@ claude plugin marketplace add Offwhite-Del/contextlean \
 claude plugin install contextlean@contextlean
 ```
 
-Reload plugins or start a new session, then invoke `/contextlean:optimize-agent-context` or ask Claude to audit the Agent environment.
+Reload plugins or open a new session, then invoke `/contextlean:optimize-agent-context` or ask Claude to audit the Agent environment.
 
-The same `SKILL.md`, reference, and CLI implementation are shared by both plugin packages.
+### Other Agent Skills clients
 
-## Use with other Agents
-
-The reusable Skill is located at:
-
-```text
-plugins/contextlean/skills/optimize-agent-context/
-```
-
-Install that folder with the target client's Agent Skills installer or copy it into the client's supported Skill directory. Agent Skills standardize the Skill contents and progressive disclosure model; installation paths still vary across products.
+The portable Skill lives at [`plugins/contextlean/skills/optimize-agent-context/`](plugins/contextlean/skills/optimize-agent-context/). Install that folder with the target client's Skill installer or copy it into a supported Skill directory. The Skill, reference, and CLI implementation are shared by the Codex and Claude packages to prevent drift.
 
 ## Safe apply workflow
 
-1. Generate a read-only audit and plan scaffold:
+```bash
+contextlean audit --root . --json
+contextlean plan --root . --write .contextlean/plan.json
+# Review and complete the replace operations in the plan.
+contextlean apply --plan .contextlean/plan.json --yes
+contextlean verify --receipt .contextlean/backups/<id>/receipt.json
+contextlean rollback --receipt .contextlean/backups/<id>/receipt.json --yes
+```
 
-   ```bash
-   contextlean audit --root . --json
-   contextlean plan --root . --write .contextlean/plan.json
-   ```
+Version 0.1 accepts complete replacements only for known instruction filenames and `SKILL.md`. Each operation must contain the current SHA-256. If a source changes after plan creation, ContextLean refuses to overwrite it. Configuration findings remain advisory.
 
-2. Have a human or Agent fill only reviewed `replace` operations. Each operation must contain the current SHA-256 from the audit and the complete replacement content. Version 0.1 accepts known instruction filenames and `SKILL.md`; configuration findings are advisory.
-3. Review the entire plan, then apply and verify:
+## Safety boundaries
 
-   ```bash
-   contextlean apply --plan .contextlean/plan.json --yes
-   contextlean verify --receipt .contextlean/backups/<id>/receipt.json
-   ```
+ContextLean does **not**:
 
-4. Roll back if quality, tool behavior, or representative-task results regress:
+- read authentication files, keychains, `.env` files, secret values, or private Agent transcripts;
+- upload prompts, configuration, source code, reports, or telemetry;
+- delete files, install services, enable hooks, or add MCP servers;
+- automatically decide that shorter instructions are better;
+- promise “100% model capability” or eliminate provider/network latency.
 
-   ```bash
-   contextlean rollback --receipt .contextlean/backups/<id>/receipt.json --yes
-   ```
+Plans, backups, and receipts remain under `.contextlean/`, which is ignored by Git by default. Review them separately before sharing.
 
-Plans, backups, and receipts live under `.contextlean/` and are ignored by Git by default.
+## Method and initial evidence
 
-## Method
+The CLI owns deterministic work: measurement, hashes, backups, exact writes, verification, and restoration. The Skill owns contextual judgment: what to preserve, what to move on demand, and which representative tasks must still pass.
 
-ContextLean separates deterministic safety from contextual judgment:
-
-- The CLI measures, hashes, backs up, applies exact reviewed content, verifies, and restores.
-- The Skill tells the Agent how to classify evidence, preserve non-testable boundaries, and run representative comparisons.
-- The user decides whether latency, quality, cost, or available tools matter most for the target workflow.
-
-Approximate token counts use `bytes / 4`. Thresholds are review heuristics, not universal quality limits. A smaller prompt is an improvement only when the same representative tasks still pass.
-
-## Initial evidence
-
-The first real-world case reduced combined always-on rule files from 6,148 to 3,191 bytes (48.1%) and reduced the same simple Codex prompt by 751 input tokens. Single-run latency also improved, but those timings were network- and cache-sensitive and are not a product guarantee.
-
-This case motivated the safety model: audit first, change one category at a time, preserve explicit boundaries, verify on real tasks, and keep exact rollback evidence.
+The first real-world case reduced combined always-on rules from 6,148 to 3,191 bytes (48.1%) and reduced the same simple Codex prompt by 751 input tokens. A single-run latency improvement was also observed, but it was network- and cache-sensitive and is **not** a product benchmark or guarantee.
 
 ## Related projects
 
-- [PrismoDev](https://github.com/shanirsh/prismodev) focuses on local session observability, token waste, noisy command output, and later-session verification.
-- [ECC](https://github.com/affaan-m/ECC) is a broad cross-harness operating system with many Skills, hooks, rules, and orchestration features.
+- [PrismoDev](https://github.com/shanirsh/prismodev) focuses on local session observability, token waste, noisy output, and later-session verification.
+- [ECC](https://github.com/affaan-m/ECC) provides a broad cross-harness collection of Skills, hooks, rules, and orchestration features.
+- [OpenSSF Scorecard](https://github.com/ossf/scorecard) measures open-source security practices; it complements ContextLean but does not optimize Agent context.
 
-ContextLean stays deliberately narrower: local configuration diagnosis and reversible changes without reading private session transcripts or adding a new runtime control plane.
+ContextLean remains deliberately narrow: diagnose local Agent configuration and make reviewed changes reversible, without reading private session transcripts or adding a new runtime control plane.
 
-## Development
+## Project layout
 
-```bash
-npm ci
-npm test
-npm run validate
-python3 /path/to/skill-creator/scripts/quick_validate.py \
-  plugins/contextlean/skills/optimize-agent-context
-python3 /path/to/plugin-creator/scripts/validate_plugin.py \
-  plugins/contextlean
-claude plugin validate plugins/contextlean
+```text
+bin/contextlean.mjs                         CLI entry point
+plugins/contextlean/                       Codex and Claude plugin package
+  skills/optimize-agent-context/           Portable Agent Skill
+test/contextlean.test.mjs                  Cross-platform behavior tests
+.agents/plugins/marketplace.json           Codex marketplace
+.claude-plugin/marketplace.json            Claude marketplace
 ```
 
-CI tests Node.js 18, 20, and 22 on Linux, plus Node.js 20 on macOS and Windows.
+## Contributing
+
+Bug reports and focused improvements are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before opening an issue or pull request. Releases are documented in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

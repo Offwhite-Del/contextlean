@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability / 安全漏洞
+    url: https://github.com/Offwhite-Del/contextlean/security/advisories/new
+    about: Report security issues privately / 请私下报告安全问题
+  - name: Support guidance / 获取帮助
+    url: https://github.com/Offwhite-Del/contextlean/blob/main/SUPPORT.md
+    about: Read the support and privacy boundaries / 阅读支持方式与隐私边界
