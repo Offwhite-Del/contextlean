@@ -54,6 +54,7 @@ const ASSERTION_KEYS = new Set([
   "maxToolCalls",
   "maxRepeatedReads",
   "sideEffectsZero",
+  "jsonFileLineCitations",
 ]);
 
 const ALLOWED_TARGET_NAMES = new Set([
@@ -367,6 +368,18 @@ function resolveInside(root, relativePath) {
   return target;
 }
 
+function assertPortableRelativeFilePath(relativePath, label) {
+  assertString(relativePath, label);
+  assert(!path.isAbsolute(relativePath), `${label} must be relative.`);
+  assert(!relativePath.includes("\\") && !relativePath.includes(":"), `${label} must use portable forward-slash segments.`);
+  const segments = relativePath.split("/");
+  assert(segments.length > 0 && segments.every((segment) => segment && segment !== "." && segment !== ".."), `${label} contains a non-canonical path segment.`);
+}
+
+function hasVisibleText(value) {
+  return value.replace(/[\p{White_Space}\p{Cf}]/gu, "").length > 0;
+}
+
 function pathInside(root, target) {
   const relative = path.relative(path.resolve(root), path.resolve(target));
   return relative !== "" && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative);
@@ -583,7 +596,8 @@ function validateTasks(tasks, options = {}) {
     for (const key of assertionKeys) assert(ASSERTION_KEYS.has(key), `Task ${task.id} has unsupported assertion: ${key}`);
     const hasOutputAssertion = task.assertions.outputEquals !== undefined
       || (Array.isArray(task.assertions.outputIncludes) && task.assertions.outputIncludes.length > 0)
-      || (Array.isArray(task.assertions.outputExcludes) && task.assertions.outputExcludes.length > 0);
+      || (Array.isArray(task.assertions.outputExcludes) && task.assertions.outputExcludes.length > 0)
+      || task.assertions.jsonFileLineCitations !== undefined;
     assert(hasOutputAssertion, `Task ${task.id} must include at least one output assertion.`);
     if (task.assertions.success !== undefined) assert(typeof task.assertions.success === "boolean", `Task ${task.id} success assertion must be boolean.`);
     if (task.assertions.outputEquals !== undefined) {
@@ -600,6 +614,33 @@ function validateTasks(tasks, options = {}) {
       if (task.assertions[key] !== undefined) assert(Number.isInteger(task.assertions[key]) && task.assertions[key] >= 0, `Task ${task.id} ${key} must be a non-negative integer.`);
     }
     if (task.assertions.sideEffectsZero !== undefined) assert(typeof task.assertions.sideEffectsZero === "boolean", `Task ${task.id} sideEffectsZero must be boolean.`);
+    if (task.assertions.jsonFileLineCitations !== undefined) {
+      const citation = task.assertions.jsonFileLineCitations;
+      assert(isObject(citation), `Task ${task.id} jsonFileLineCitations must be an object.`);
+      assertOnlyKeys(citation, ["jsonField", "citationField", "minItems", "sources"], `Task ${task.id} jsonFileLineCitations`);
+      for (const key of ["jsonField", "citationField"]) {
+        assertString(citation[key], `Task ${task.id} jsonFileLineCitations.${key}`);
+        assert(/^[A-Za-z_][A-Za-z0-9_-]{0,127}$/.test(citation[key]), `Task ${task.id} jsonFileLineCitations.${key} is invalid.`);
+      }
+      assert(Number.isInteger(citation.minItems) && citation.minItems >= 1 && citation.minItems <= 1_000, `Task ${task.id} jsonFileLineCitations.minItems must be an integer from 1 to 1000.`);
+      assert(Array.isArray(citation.sources) && citation.sources.length >= 1 && citation.sources.length <= 64, `Task ${task.id} jsonFileLineCitations.sources must contain 1 to 64 files.`);
+      assertString(options.tasksRoot, `Task ${task.id} citation task root`);
+      const sourcePaths = new Set();
+      for (const source of citation.sources) {
+        assertOnlyKeys(source, ["path", "sha256"], `Task ${task.id} citation source`);
+        assertString(source.path, `Task ${task.id} citation source path`);
+        assert(source.path.length <= 512, `Task ${task.id} citation source path exceeds 512 characters.`);
+        assertPortableRelativeFilePath(source.path, `Task ${task.id} citation source path`);
+        assertSafeCanonicalSourcePath(source.path);
+        assertSha256(source.sha256, `Task ${task.id} citation source SHA-256`);
+        assert(!sourcePaths.has(source.path), `Task ${task.id} has duplicate citation source: ${source.path}`);
+        sourcePaths.add(source.path);
+        const sourcePath = resolveInside(options.tasksRoot, source.path);
+        const safeSource = resolveSafeRegularRead(sourcePath, MAX_CANONICAL_SOURCE_BYTES);
+        const inspected = inspectSourceRanges(safeSource.resolved, []);
+        assert(inspected.sha256 === source.sha256, `Task ${task.id} citation source hash changed: ${source.path}`);
+      }
+    }
     if (task.rubric !== undefined) {
       assertString(task.rubric, `Task ${task.id} rubric`);
       assertPlainText(task.rubric, `Task ${task.id} rubric`);
@@ -687,7 +728,8 @@ export function initExperiment(options = {}) {
   const tasksArtifact = readPrivateJsonArtifact(tasksPath);
   const profileArtifact = readPrivateJsonArtifact(profilePath);
   const snapshot = validateSnapshot(snapshotArtifact.value);
-  const tasks = validateTasks(tasksArtifact.value);
+  const tasksRoot = fs.realpathSync(path.dirname(tasksPath));
+  const tasks = validateTasks(tasksArtifact.value, { tasksRoot });
   const profile = validateProfile(profileArtifact.value);
   validateProfileAgainstTasks(profile, tasks);
   const repetitions = Number(options.repetitions ?? 3);
@@ -728,7 +770,8 @@ function validateExperiment(experiment) {
   delete copy.experimentSha256;
   assert(hashObject(copy) === experiment.experimentSha256, "Experiment self-hash mismatch.");
   const profile = validateProfile(experiment.profile?.value);
-  const tasks = validateTasks({ schema: SCHEMAS.tasks, tasks: experiment.tasks?.items || [] }, { allowTaskSha256: true });
+  const tasksRoot = fs.realpathSync(path.dirname(experiment.tasks?.path || ""));
+  const tasks = validateTasks({ schema: SCHEMAS.tasks, tasks: experiment.tasks?.items || [] }, { allowTaskSha256: true, tasksRoot });
   for (const task of tasks.tasks) {
     assertSha256(task.taskSha256, `Task ${task.id} taskSha256`);
     const { taskSha256, ...frozenTask } = task;
@@ -1126,7 +1169,63 @@ function validateRunnerOutput(response, expectedEnvironment) {
   return response;
 }
 
-function evaluateAssertions(task, response) {
+function evaluateJsonFileLineCitations(assertion, output, tasksRoot) {
+  const checks = [];
+  const add = (name, ok) => checks.push({ name, ok: Boolean(ok) });
+  let parsed;
+  try {
+    parsed = JSON.parse(output);
+    add("jsonFileLineCitations:json", true);
+  } catch {
+    add("jsonFileLineCitations:json", false);
+    return checks;
+  }
+  const items = isObject(parsed) ? parsed[assertion.jsonField] : undefined;
+  add("jsonFileLineCitations:fieldArray", Array.isArray(items));
+  if (!Array.isArray(items)) return checks;
+  add("jsonFileLineCitations:minItems", items.length >= assertion.minItems);
+
+  const allowlist = new Map(assertion.sources.map((source) => [source.path, source]));
+  const citationsBySource = new Map();
+  items.forEach((item, index) => {
+    const value = isObject(item) ? item[assertion.citationField] : undefined;
+    add(`jsonFileLineCitations:${index}:string`, typeof value === "string");
+    if (typeof value !== "string") return;
+    const match = value.match(/^([^:\r\n]+):([1-9][0-9]*)$/);
+    const lineNumber = match ? Number(match[2]) : NaN;
+    const syntaxOk = Boolean(match) && Number.isSafeInteger(lineNumber);
+    add(`jsonFileLineCitations:${index}:syntax`, syntaxOk);
+    if (!syntaxOk) return;
+    const source = allowlist.get(match[1]);
+    add(`jsonFileLineCitations:${index}:allowlist`, Boolean(source));
+    if (!source) return;
+    const citations = citationsBySource.get(source.path) || [];
+    citations.push({ index, lineNumber });
+    citationsBySource.set(source.path, citations);
+  });
+
+  for (const [sourceRelativePath, citations] of citationsBySource.entries()) {
+    const source = allowlist.get(sourceRelativePath);
+    const sourcePath = resolveInside(tasksRoot, sourceRelativePath);
+    const safeSource = resolveSafeRegularRead(sourcePath, MAX_CANONICAL_SOURCE_BYTES);
+    const ranges = citations.map(({ index, lineNumber }) => ({
+      id: `citation-${index}`,
+      startLine: lineNumber,
+      endLine: lineNumber,
+    }));
+    const inspected = inspectSourceRanges(safeSource.resolved, ranges);
+    add(`jsonFileLineCitations:${sourceRelativePath}:sha256`, inspected.sha256 === source.sha256);
+    for (const { index } of citations) {
+      const rangeId = `citation-${index}`;
+      const exists = !inspected.invalidRanges.includes(rangeId);
+      add(`jsonFileLineCitations:${index}:exists`, exists);
+      add(`jsonFileLineCitations:${index}:nonEmpty`, exists && hasVisibleText(inspected.chunks.get(rangeId)));
+    }
+  }
+  return checks;
+}
+
+export function evaluateAssertions(task, response, options = {}) {
   const assertions = task.assertions;
   const checks = [];
   function add(name, ok) {
@@ -1143,6 +1242,10 @@ function evaluateAssertions(task, response) {
   if (assertions.exactToolCalls !== undefined) add("exactToolCalls", response.metrics.toolCalls === assertions.exactToolCalls);
   if (assertions.maxToolCalls !== undefined) add("maxToolCalls", response.metrics.toolCalls !== null && response.metrics.toolCalls <= assertions.maxToolCalls);
   if (assertions.maxRepeatedReads !== undefined) add("maxRepeatedReads", response.metrics.repeatedReads !== null && response.metrics.repeatedReads <= assertions.maxRepeatedReads);
+  if (assertions.jsonFileLineCitations !== undefined) {
+    assertString(options.tasksRoot, `Task ${task.id} citation task root`);
+    checks.push(...evaluateJsonFileLineCitations(assertions.jsonFileLineCitations, response.output, options.tasksRoot));
+  }
   if (assertions.sideEffectsZero !== false) {
     for (const key of SIDE_EFFECT_KEYS) add(`${key}:zero`, response.sideEffects[key] === 0);
   }
@@ -1167,7 +1270,7 @@ function runOneVariant(runnerPath, experiment, task, variantLabel, content, repe
   };
   const { response, binding } = invokeAdapter(runnerPath, "runner", request);
   validateRunnerOutput(response, experiment.environment);
-  const evaluation = evaluateAssertions(task, response);
+  const evaluation = evaluateAssertions(task, response, { tasksRoot: fs.realpathSync(path.dirname(experiment.tasks.path)) });
   return {
     taskId: task.id,
     category: task.category,

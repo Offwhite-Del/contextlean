@@ -14,6 +14,7 @@ import {
 } from "../plugins/contextlean/skills/optimize-agent-context/scripts/contextlean.mjs";
 import {
   createSnapshot,
+  evaluateAssertions,
   generateCandidates,
   hashArtifact,
   hashValue,
@@ -103,8 +104,8 @@ function preparePipeline(options = {}) {
   writeSnapshot(snapshot, snapshotPath);
   const experiment = initExperiment({
     snapshotPath,
-    tasksPath: tasksFixture,
-    profilePath: profileFixture,
+    tasksPath: options.tasksPath || tasksFixture,
+    profilePath: options.profilePath || profileFixture,
     model: "gpt-5.6-sol",
     reasoning: "high",
     repetitions: 1,
@@ -122,6 +123,83 @@ function preparePipeline(options = {}) {
   });
   const sandboxReceipt = { path: sandboxReceiptPath, sha256: hashValue(fs.readFileSync(sandboxReceiptPath)) };
   return { base, root, home, target, snapshot, snapshotPath, experiment, experimentPath, optimizerPath, sandboxReceipt };
+}
+
+function citationAssertionFixture() {
+  const { base } = fixture();
+  const sourceRelativePath = "fixtures/facts.md";
+  const sourceContent = "first fact\n \u200b \nthird fact\nlast fact";
+  write(path.join(base, sourceRelativePath), sourceContent);
+  const assertion = {
+    jsonField: "facts",
+    citationField: "citation",
+    minItems: 3,
+    sources: [{ path: sourceRelativePath, sha256: hashValue(sourceContent) }],
+  };
+  const task = {
+    id: "citation-hard-gate",
+    category: "citation",
+    prompt: "Return frozen facts as JSON with exact citations.",
+    dataClass: "non_sensitive",
+    heldOut: false,
+    allowedTools: ["read_file"],
+    assertions: { jsonFileLineCitations: assertion },
+  };
+  const response = (output) => ({
+    output,
+    success: true,
+    metrics: { toolCalls: 1, repeatedReads: 0 },
+    sideEffects: { unauthorizedWrites: 0, privacyViolations: 0, networkNodeChanges: 0, safetyViolations: 0 },
+  });
+  return { base, sourceRelativePath, sourceContent, assertion, task, response };
+}
+
+function oneTaskProfile(category) {
+  return {
+    schema: "contextlean.profile/v1",
+    invariants: [{ id: "citation-integrity", description: "Reject citations that do not resolve to non-empty frozen source lines." }],
+    objectives: ["Keep deterministic quality non-regressing."],
+    qualityGates: {
+      requiredCategoryPasses: { [category]: 1 },
+      minBlindNonInferior: 1,
+      maxBlindLosses: 0,
+      minBlindNetWins: 1,
+      minInputTokenImprovementPct: 5,
+      minToolImprovementPct: 10,
+      minLatencyImprovementPct: 10,
+      maxOtherRegressionPct: 10,
+    },
+  };
+}
+
+function writeInlineRunner(filePath, output) {
+  const source = `#!/usr/bin/env node
+let input = "";
+for await (const chunk of process.stdin) input += chunk;
+const request = JSON.parse(input);
+if (request.role !== "runner" || Object.hasOwn(request.task, "assertions")) process.exit(10);
+process.stdout.write(JSON.stringify({
+  schema: "contextlean.runner-output/v1",
+  output: ${JSON.stringify(output)},
+  success: true,
+  metrics: {
+    inputTokens: 20,
+    cachedInputTokens: 0,
+    outputTokens: 10,
+    reasoningTokens: 1,
+    toolCalls: 1,
+    repeatedReads: 0,
+    toolErrors: 0,
+    retries: 0,
+    latencyMs: 10,
+    unavailableReasons: {},
+  },
+  environment: request.environment,
+  sideEffects: { unauthorizedWrites: 0, privacyViolations: 0, networkNodeChanges: 0, safetyViolations: 0 },
+  sandbox: { qualified: true, receiptSha256: request.sandboxReceipt.sha256 },
+}));
+`;
+  write(filePath, source);
 }
 
 function runPipeline(mode = "default") {
@@ -166,6 +244,88 @@ test("snapshot separates controllable surfaces without including file contents",
   assert.ok(kinds.has("fixed_context"));
   assert.equal(serialized.includes("Preserve safety and verify real outcomes"), false);
   assert.equal(prepared.snapshot.privacy.contentIncluded, false);
+});
+
+test("file-line citation assertions require allowlisted existing non-empty source lines", () => {
+  const citation = citationAssertionFixture();
+  const evaluate = (output) => evaluateAssertions(citation.task, citation.response(output), { tasksRoot: citation.base });
+  const valid = evaluate(JSON.stringify({ facts: [
+    { citation: `${citation.sourceRelativePath}:1` },
+    { citation: `${citation.sourceRelativePath}:3` },
+    { citation: `${citation.sourceRelativePath}:4` },
+  ] }));
+  assert.equal(valid.pass, true, "first, interior, and last non-empty lines should pass");
+
+  const failures = [
+    ["not-json", "json"],
+    [JSON.stringify({ wrong: [] }), "fieldArray"],
+    [JSON.stringify({ facts: [{ wrong: `${citation.sourceRelativePath}:1` }, { citation: `${citation.sourceRelativePath}:3` }, { citation: `${citation.sourceRelativePath}:4` }] }), "0:string"],
+    [JSON.stringify({ facts: [{ citation: 1 }, { citation: `${citation.sourceRelativePath}:3` }, { citation: `${citation.sourceRelativePath}:4` }] }), "0:string"],
+    [JSON.stringify({ facts: [{ citation: "unknown.md:1" }, { citation: `${citation.sourceRelativePath}:3` }, { citation: `${citation.sourceRelativePath}:4` }] }), "0:allowlist"],
+    [JSON.stringify({ facts: [{ citation: "/tmp/facts.md:1" }, { citation: `${citation.sourceRelativePath}:3` }, { citation: `${citation.sourceRelativePath}:4` }] }), "0:allowlist"],
+    [JSON.stringify({ facts: [{ citation: "../facts.md:1" }, { citation: `${citation.sourceRelativePath}:3` }, { citation: `${citation.sourceRelativePath}:4` }] }), "0:allowlist"],
+    [JSON.stringify({ facts: [{ citation: `${citation.sourceRelativePath}:0` }, { citation: `${citation.sourceRelativePath}:3` }, { citation: `${citation.sourceRelativePath}:4` }] }), "0:syntax"],
+    [JSON.stringify({ facts: [{ citation: `${citation.sourceRelativePath}:-1` }, { citation: `${citation.sourceRelativePath}:3` }, { citation: `${citation.sourceRelativePath}:4` }] }), "0:syntax"],
+    [JSON.stringify({ facts: [{ citation: `${citation.sourceRelativePath}:1.5` }, { citation: `${citation.sourceRelativePath}:3` }, { citation: `${citation.sourceRelativePath}:4` }] }), "0:syntax"],
+    [JSON.stringify({ facts: [{ citation: `${citation.sourceRelativePath}:１` }, { citation: `${citation.sourceRelativePath}:3` }, { citation: `${citation.sourceRelativePath}:4` }] }), "0:syntax"],
+    [JSON.stringify({ facts: [{ citation: `${citation.sourceRelativePath}:١` }, { citation: `${citation.sourceRelativePath}:3` }, { citation: `${citation.sourceRelativePath}:4` }] }), "0:syntax"],
+    [JSON.stringify({ facts: [{ citation: "fixtures\\facts.md:1" }, { citation: `${citation.sourceRelativePath}:3` }, { citation: `${citation.sourceRelativePath}:4` }] }), "0:allowlist"],
+    [JSON.stringify({ facts: [{ citation: `${citation.sourceRelativePath}:1` }, { citation: `${citation.sourceRelativePath}:3` }, { citation: `${citation.sourceRelativePath}:5` }] }), "2:exists"],
+    [JSON.stringify({ facts: [{ citation: `${citation.sourceRelativePath}:1` }, { citation: `${citation.sourceRelativePath}:2` }, { citation: `${citation.sourceRelativePath}:4` }] }), "1:nonEmpty"],
+  ];
+  for (const [output, failedCheck] of failures) {
+    const result = evaluate(output);
+    assert.equal(result.pass, false, `expected ${failedCheck} to fail`);
+    assert.ok(result.checks.some((check) => check.name.endsWith(failedCheck) && check.ok === false), `missing failed check ${failedCheck}`);
+  }
+});
+
+test("citation assertion configuration rejects unsafe or unbound source paths during task validation", () => {
+  for (const unsafePath of ["/tmp/facts.md", "../facts.md", "missing/facts.md", "C:\\facts.md", "fixtures\\facts.md", "fixtures/./facts.md"]) {
+    const citation = citationAssertionFixture();
+    const tasksPath = path.join(citation.base, "tasks.json");
+    const profilePath = path.join(citation.base, "profile.json");
+    const tasks = { schema: "contextlean.tasks/v1", tasks: [structuredClone(citation.task)] };
+    tasks.tasks[0].assertions.jsonFileLineCitations.sources[0].path = unsafePath;
+    write(tasksPath, `${JSON.stringify(tasks, null, 2)}\n`);
+    write(profilePath, `${JSON.stringify(oneTaskProfile("citation"), null, 2)}\n`);
+    assert.throws(() => preparePipeline({ tasksPath, profilePath }), /must be relative|escapes root|non-regular|missing|portable forward-slash|non-canonical/);
+  }
+});
+
+test("citation hard gate runs inside experiment scoring without leaking assertions to the runner", () => {
+  for (const validOutput of [true, false]) {
+    const citation = citationAssertionFixture();
+    const tasksPath = path.join(citation.base, "tasks.json");
+    const profilePath = path.join(citation.base, "profile.json");
+    write(tasksPath, `${JSON.stringify({ schema: "contextlean.tasks/v1", tasks: [citation.task] }, null, 2)}\n`);
+    write(profilePath, `${JSON.stringify(oneTaskProfile("citation"), null, 2)}\n`);
+    const prepared = preparePipeline({ tasksPath, profilePath });
+    const candidate = generateCandidates({ experimentPath: prepared.experimentPath, adapterPath: prepared.optimizerPath, targetPath: prepared.target });
+    const candidatePath = path.join(prepared.base, "candidate.json");
+    writeCandidates(candidate, candidatePath);
+    const output = JSON.stringify({ facts: [
+      { citation: `${citation.sourceRelativePath}:1` },
+      { citation: `${citation.sourceRelativePath}:3` },
+      { citation: `${citation.sourceRelativePath}:${validOutput ? 4 : 5}` },
+    ] });
+    const inlineRunner = path.join(prepared.base, `runner-${validOutput}.mjs`);
+    writeInlineRunner(inlineRunner, output);
+    const runnerPath = path.join(prepared.base, "runner.json");
+    const judgePath = path.join(prepared.base, "judge.json");
+    writePrivateJson(runnerPath, {
+      schema: "contextlean.adapter/v1",
+      role: "runner",
+      argv: [process.execPath, inlineRunner],
+      timeoutMs: 10_000,
+      sandboxReceipt: prepared.sandboxReceipt,
+    });
+    writePrivateJson(judgePath, adapterSpec("judge"));
+    const result = runExperiment({ experimentPath: prepared.experimentPath, candidatePath, runnerPath, judgePath });
+    const passes = [result.baselineRuns[0].deterministicPass, result.candidates[0].runs[0].deterministicPass];
+    assert.deepEqual(passes, [validOutput, validOutput]);
+    assert.ok(result.baselineRuns[0].checks.some((check) => check.name.endsWith(validOutput ? ":nonEmpty" : ":exists") && check.ok === validOutput));
+  }
 });
 
 test("synthetic 24-task protocol fixture selects only its declared metric gain and emits a v1 apply plan", () => {
