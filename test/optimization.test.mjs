@@ -39,6 +39,21 @@ const profileFixture = path.join(repositoryRoot, "examples", "optimization", "pr
 const smokeProfileFixture = path.join(repositoryRoot, "examples", "optimization", "smoke-profile.json");
 const smokeTasksFixture = path.join(repositoryRoot, "examples", "optimization", "smoke-tasks.json");
 const tasksFixture = path.join(repositoryRoot, "examples", "optimization", "full-tasks.json");
+const bundledSkill = path.join(repositoryRoot, "plugins", "contextlean", "skills", "optimize-agent-context", "SKILL.md");
+
+test("bundled Skill stays concise and preserves progressive-disclosure boundaries", () => {
+  const content = fs.readFileSync(bundledSkill, "utf8");
+
+  assert.ok(Buffer.byteLength(content) <= 2_600, "Bundled Skill exceeds its 2,600-byte disclosure budget.");
+  assert.match(content, /Do not use for ordinary code edits, model\/provider tuning, or unsupported speed claims/);
+  assert.match(content, /Quality comes first; shorter context alone is not a win/);
+  assert.match(content, /protocols-and-evaluation\.md/);
+  assert.match(content, /safety-and-method\.md/);
+  assert.match(content, /contextlean\.mjs apply/);
+  assert.match(content, /contextlean\.mjs verify/);
+  assert.match(content, /contextlean\.mjs rollback/);
+  assert.match(content, /Never inspect auth files, keychains, `\.env` files, private transcripts, or secrets/);
+});
 
 function fixture() {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "contextlean-v2-test-"));
